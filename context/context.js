@@ -155,7 +155,128 @@ export const PROVIDER = ({ children }) => {
           outputAmount: trade.outputAmount,
         })),
 
-        tradeType: trades[0]
+      tradeType: trades[0].tradeType,
     });
   }
+
+  // demo account
+  const RECIPIENT = "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B";
+
+  // swap function
+
+  const swap = async (token_1, token_2, swapInputAmount) => {
+    try {
+      console.log("CALLING ME_____________SWAP");
+      const _inputAmount = 1;
+      const provider = web3Provider();
+
+      const network = await provider.getNetwork();
+      // const ETHER = Ether.onChain(network.chainId);
+      const ETHER = Ether.onChain(1);
+
+      /// TOKEN CONTRACT
+      const tokenAddress1 = await CONNECTING_CONTRACT("");
+      const tokenAddress2 = await CONNECTING_CONTRACT("");
+
+      // token details
+      const TOKEN_A = new Token(
+        tokenAddress1.chainId,
+        tokenAddress1.address,
+        tokenAddress1.decimals,
+        tokenAddress1.symbol,
+        tokenAddress1.name
+      );
+
+      const TOKEN_B = new Token(
+        tokenAddress2.chainId,
+        tokenAddress2.address,
+        tokenAddress2.decimals,
+        tokenAddress2.symbol,
+        tokenAddress2.name
+      );
+
+      const WETH_USDC_V3 = await getPool(
+        TOKEN_A,
+        TOKEN_B,
+        FeeAmount.MEDIUM,
+        provider
+      );
+
+      const inputEther = ethers.utils.parseEther("1").toString();
+
+      const trade = await V3Trade.fromRoute(
+        new RouteV3([WETH_USDC_V3], TOKEN_A, TOKEN_B),
+        CurrencyAmount.fromRawAmount(Ether, inputEther),
+        TradeType.EXACT_INPUT
+      );
+
+      const routerTrade = buildTrade([trade]);
+
+      const opts = swapOption({});
+
+      const params = SwapRouter.swapERC20CallParameters(routerTrade, opts);
+
+      console.log(WETH_USDC_V3);
+      console.log(trade);
+      console.log(routerTrade);
+      console.log(opts);
+      console.log(params);
+
+      let ethBalance;
+      let tokenA;
+      let tokenB;
+
+      ethBalance = await provider.getBalance(RECIPIENT);
+      tokenA = await tokenAddress1.balance;
+      tokenB = await tokenAddress2.balance;
+
+      console.log("----------BEFORE");
+      console.log("EthBalance:", ethers.utils.formatUnits(ethBalance, 18));
+      console.log("TokenA:", tokenA);
+      console.log("TokenB:", tokenB);
+
+      const tx = await Signer.sendTransaction({
+        data: params.calldata,
+        to: "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
+        value: params.value,
+        from: RECIPIENT,
+      });
+
+      console.log("----------CALLING_ME");
+      const receipt = await tx.wait(); // wait for transaction to be mined
+      console.log("----------SUCCESS");
+      console.log("STATUS", receipt.status);
+
+      ethBalance = await provider.getBalance(RECIPIENT);
+      tokenA = await tokenAddress1.balance;
+      tokenB = await tokenAddress2.balance;
+      console.log("----------AFTER");
+
+      console.log("EthBalance:", ethers.utils.formatUnits(ethBalance, 18));
+      console.log("TokenA:", tokenA);
+      console.log("TokenB:", tokenB);
+    } catch (error) {
+      const errorMsg = parseErrorMsg(error);
+      notifyError(errorMsg);
+      console.log(error);
+    }
+  };
+
+  return (
+    <CONTEXT.Provider
+      value={{
+        TOKEN_SWAP,
+        LOAD_TOKEN,
+        notifyError,
+        notifySuccess,
+        setLoader,
+        loader,
+        connect,
+        address,
+        swap,
+      }}
+    >
+      {children}
+    </CONTEXT.Provider>
+  );
 };
