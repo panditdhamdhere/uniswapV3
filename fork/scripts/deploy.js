@@ -6,7 +6,9 @@ const {
   CurrencyAmount,
   Percent,
 } = require("@uniswap/sdk-core");
+
 const { Trade: V2Trade } = require("@uniswap/v2-sdk");
+
 const {
   Pool,
   nearestUsableTick,
@@ -21,6 +23,7 @@ const { MixedRouteTrade, Trade: RouterTrade } = require("@uniswap/router-sdk");
 const IUniswapV3Pool = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Pool.sol/UniswapV3Pool.json");
 
 const JSBI = require("jsbi");
+
 const erc20Abi = require("../abis__erc20.json");
 
 const hardhat = require("hardhat");
@@ -38,7 +41,7 @@ const WETH = new Token(
 
 const USDC = new Token(
   1,
-  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
   6,
   "USDC",
   "USD Coin"
@@ -56,7 +59,6 @@ const usdcContract = new hardhat.ethers.Contract(
   provider
 );
 
-// internal function
 async function getPool(tokenA, tokenB, feeAmount) {
   const [token0, token1] = tokenA.sortsBefore(tokenB)
     ? [tokenA, tokenB]
@@ -64,7 +66,7 @@ async function getPool(tokenA, tokenB, feeAmount) {
 
   const poolAddress = Pool.getAddress(token0, token1, feeAmount);
 
-  const contract = new ethers.Contract(
+  const contract = new hardhat.ethers.Contract(
     poolAddress,
     IUniswapV3Pool.abi,
     provider
@@ -77,16 +79,15 @@ async function getPool(tokenA, tokenB, feeAmount) {
   liquidity = JSBI.BigInt(liquidity.toString());
   sqrtPriceX96 = JSBI.BigInt(sqrtPriceX96.toString());
 
-  console.log("CALLING_POOL---------");
   return new Pool(token0, token1, feeAmount, sqrtPriceX96, liquidity, tick, [
     {
       index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING[feeAmount]),
-      liquidity: liquidity,
+      liquidityNet: liquidity,
       liquidityGross: liquidity,
     },
     {
       index: nearestUsableTick(TickMath.MIN_TICK, TICK_SPACING[feeAmount]),
-      liquidity: JSBI.multiply(liquidity, JSBI.BigInt("-1")),
+      liquidityNet: JSBI.multiply(liquidity, JSBI.BigInt("-1")),
       liquidityGross: liquidity,
     },
   ]);
@@ -105,7 +106,7 @@ function swapOption(options) {
 
 //build trade
 
-function buildTrade(trade) {
+function buildTrade(trades) {
   return new RouterTrade({
     v2Routes: trades
       .filter((trade) => trade instanceof V2Trade)
@@ -160,11 +161,11 @@ async function main() {
   let usdcBalance;
 
   ethBalance = await provider.getBalance(RECIPIENT);
-  wethBalance = await wethContract.balance;
-  usdcBalance = await usdcContract.balance;
+  wethBalance = await wethContract.balanceOf(RECIPIENT);
+  usdcBalance = await usdcContract.balanceOf(RECIPIENT);
 
   console.log("----------BEFORE");
-  console.log("EthBalance:", hardhat.ethers.utils.formatUnits(ethBalance, 18));
+  console.log("ethBalance:", hardhat.ethers.utils.formatUnits(ethBalance, 18));
   console.log(
     "wethBalance:",
     hardhat.ethers.utils.formatUnits(wethBalance, 18)
@@ -201,8 +202,7 @@ async function main() {
   console.log("TokenB:", hardhat.ethers.utils.formatUnits(usdcBalance, 6));
 }
 
-
-// node deploy script 
+// node deploy script
 
 main()
   .then(() => process.exit(0))
